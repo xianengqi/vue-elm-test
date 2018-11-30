@@ -2,6 +2,7 @@ import {
   GET_USERINFO,
   SAVE_GEOHASH,
   RECORD_ADDRESS,
+  RECORD_SHOPDETAIL,
   ADD_CART,
   REDUCE_CART
 } from './mutation_types'
@@ -30,6 +31,10 @@ const mutations = {
   [RECORD_ADDRESS] (state, { latitude, longitude }) {
     state.latitude = latitude
     state.longitude = longitude
+  },
+
+  [RECORD_SHOPDETAIL] (state, detail) {
+    state.shopDetail = detail
   },
   // 加入购物车
   [ADD_CART] (state, {
