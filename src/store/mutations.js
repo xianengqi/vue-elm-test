@@ -4,7 +4,9 @@ import {
   RECORD_ADDRESS,
   RECORD_SHOPDETAIL,
   ADD_CART,
-  REDUCE_CART
+  REDUCE_CART,
+  INIT_BUYCART,
+  CLEAR_CART
 } from './mutation_types'
 import { getStore, setStore } from '../config/mUtils'
 
@@ -22,6 +24,19 @@ const mutations = {
     } else {
       state.userInfo = null
     }
+  },
+  // 网页初始化时从本地缓存获取购物车数据
+  [INIT_BUYCART] (state) {
+    let initCart = getStore('buyCart')
+    if (initCart) {
+      state.cartList = JSON.parse(initCart)
+    }
+  },
+  // 清空当前商品的购物车信息
+  [CLEAR_CART] (state, shopid) {
+    state.cartList[shopid] = null
+    state.cartList = { ...state.cartList }
+    setStore('buyCart', state.cartList)
   },
   // 保存geohash
   [SAVE_GEOHASH] (state, geohash) {
