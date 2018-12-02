@@ -2,9 +2,9 @@
   <section class="cart_module">
     <section v-if="!foods.specifications.length" class="cart_button">
       <transition name="showReduce">
-        <span @click="removeOutCart(foods.category_id, foods.item_id, foods.specfoods[0].food_id, foods.specfoods[0].name, food.specfoods[0].price, '', foods.specfoods[0].packing_fee, foods.specfoods[0].sku_id, foods.specfoods[0].stock)" v-if="foodNum">
+        <span @click="removeOutCart(foods.category_id, foods.item_id, foods.specfoods[0].food_id, foods.specfoods[0].name, foods.specfoods[0].price, '', foods.specfoods[0].packing_fee, foods.specfoods[0].sku_id, foods.specfoods[0].stock)" v-if="foodNum">
           <svg>
-            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cart-minus"></use>
+            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#icon-jian"></use>
           </svg>
         </span>
       </transition>
@@ -12,20 +12,20 @@
         <span class="cart_num" v-if="foodNum">{{foodNum}}</span>
       </transition>
       <svg class="add_icon" @click="addToCart(foods.category_id, foods.item_id, foods.specfoods[0].food_id, foods.specfoods[0].name, foods.specfoods[0].price, '', foods.specfoods[0].packing_fee, foods.specfoods[0].sku_id, foods.specfoods[0].stock, $event)">
-        <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cart-add"></use>
+        <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#icon-jia"></use>
       </svg>
     </section>
     <section v-else class="choose_specification">
       <section class="choose_icon_container">
         <transition name="showReduce">
           <svg class="specs_reduce_icon" v-if="foodNum" @click="showReduceTip">
-            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cart-minus"></use>
+            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#icon-jian"></use>
           </svg>
         </transition>
         <transition name="fade">
           <span class="cart_num" v-if="foodNum">{{foodNum}}</span>
         </transition>
-        <span class="show_chooselist" @click="show_chooselist(foods)">选规格</span>
+        <span class="show_chooselist" @click="showChooseList(foods)">选规格</span>
       </section>
     </section>
   </section>
@@ -81,7 +81,7 @@ export default {
     },
     // 加入购物车，计算按钮位置
     addToCart (category_id, item_id, food_id, name, price, specs, packing_fee, sku_id, stock, event) {
-      this.ADD_CART({ shopid: this.shopId, category_id, item_id, food_id, name, price, packing_fee, sku_id, stock })
+      this.ADD_CART({ shopid: this.shopId, category_id, item_id, food_id, name, price, specs, packing_fee, sku_id, stock })
       let elLeft = event.target.getBoundingClientRect().left
       let elBottom = event.target.getBoundingClientRect().bottom
       this.showMoveDot.push(true)
