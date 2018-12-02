@@ -131,6 +131,60 @@
               </ul>
             </section>
           </section>
+          <section class="buy_cart_container">
+            <section class="cart_icon_num" @click="toggleCartList">
+              <div class="cart_icon_container" :class="{cart_icon_activity: totalPrice > 0, move_in_cart:receiveInCart}" ref="cartContainer">
+                <span v-if="totalNum" class="cart_list_length">
+                  {{ totalNum }}
+                </span>
+                <svg class="cart_icon">
+                  <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cart-icon"></use>
+                </svg>
+              </div>
+              <div class="cart_num">
+                <div>¥ {{ totalPrice }}</div>
+                <div>配送费¥{{ deliveryFee }}</div>
+              </div>
+            </section>
+            <section class="gotopay" :class="{gotopay_acitvity: minimunOrderAmount <= 0}">
+              <span class="gotopay_button_style" v-if="minimunOrderAmount > 0">还差¥{{ minimunOrderAmount }}起送</span>
+              <router-link class="gotopay_button_style" v-else :to="{path:'/confirmOrder', query:{geohash, shopId}}">去结算</router-link>
+            </section>
+          </section>
+          <transition name="toggle-cart">
+            <section class="cart_food_list" v-show="showCartList&&cartFoodList.length">
+              <header>
+                <h4>购物车</h4>
+                <div @click="clearCart">
+                  <svg>
+                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cart-remove"></use>
+                  </svg>
+                  <span class="clear_cart">清空</span>
+                </div>
+              </header>
+              <section class="cart_food_details" id="cartFood">
+                <ul>
+                  <li v-for="(item, index) in cartFoodList" :key="index" class="cart_food_li">
+                    <div class="cart_list_num">
+                      <p class="ellipsis">{{ item.name }}</p>
+                      <p class="ellipsis">{{ item.specs }}</p>
+                    </div>
+                    <div class="cart_list_price">
+                      <span>¥</span>
+                      <span>{{ item.price }}</span>
+                    </div>
+                    <section class="cart_list_control">
+                      <span @click="removeOutCart(item.category_id, item.item_id, item.food_id, item.name, item.price, item.specs)">
+                        <svg>
+                          <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#cart-minus"></use>
+                        </svg>
+                      </span>
+                    </section>
+                  </li>
+                </ul>
+              </section>
+            </section>
+          </transition>
         </section>
       </transition>
     </section>
@@ -169,6 +223,11 @@ export default {
       ratingOffset: 0, // 评论获取数据offset值
       cartFoodList: [], // 购物车商品列表
       showCartList: false, // 显示购物车列表
+      preventRepeatRequest: false, // 防止多次触发数据请求
+      showSpecs: false, // 控制显示食品规格
+      showMoveDot: [], // 控制下落的小圆点显示隐藏
+      elLeft: 0, // 当前点击按钮在网页中的绝对top值
+      elBottom: 0, // 当前点击按钮在网页中的绝对left值
       imgBaseUrl
     }
   },
@@ -220,36 +279,6 @@ export default {
         num += item.num
       })
       return num
-    }
-  },
-  watch: {
-    // showLoading变化时说明组件已经获取初始化数据，在下一贞nextTick进行后续操作
-    showLoading (value) {
-      if (!value) {
-        this.$nextTick(() => {
-          // this.
-        })
-      }
-    },
-    // 商品，评价切换状态
-    changeShowType (value) {
-      if (value === 'rating') {
-        this.$nextTick(() => {
-          this.ratingScroll = new BScroll('#ratingContainer', {
-            probeType: 3,
-            deceleration: 0.003,
-            bounce: false,
-            swipeTime: 2000,
-            click: true
-          })
-          this.ratingScroll.on('scroll', (pos) => {
-            if (Math.abs(Math.round(pos.y)) >= Math.abs(Math.round(this.ratingScroll.maxScrollY))) {
-              this.loaderMoreRating()
-              this.ratingScroll.refresh()
-            }
-          })
-        })
-      }
     }
   },
   methods: {
@@ -405,8 +434,130 @@ export default {
       this.toggleCartList()
       this.CLEAR_CART(this.shopId)
     },
+    // 监听圆点是否进入购物车
+    listenInCart () {
+      if (!this.receiveInCart) {
+        this.receiveInCart = true
+        this.$refs.cartContainer.addEventListener('animationend', () => {
+          this.receiveInCart = false
+        })
+        this.$refs.cartContainer.addEventListener('webkitAnimationEnd', () => {
+          this.receiveInCart = false
+        })
+      }
+    },
+    // 获取不同类型的评论列表
+    async changeTgeIndex (index, name) {
+      this.ratingTageIndex = index
+      this.ratingOffset = 0
+      this.ratingTagName = name
+      let res = await getRatingList(this.shopId, this.ratingOffset, name)
+      this.ratingList = [...res]
+      this.$nextTick(() => {
+        this.ratingScroll.refresh()
+      })
+    },
+    // 加载更多评论
+    async loaderMoreRating () {
+      if (this.preventRepeatRequest) {
+        return
+      }
+      this.loadRatings = true
+      this.preventRepeatRequest = true
+      this.ratingOffset += 10
+      let ratingDate = await getRatingList(this.shopId, this.ratingOffset, this.ratingTagName)
+      this.loadRating = false
+      if (ratingDate.length >= 10) {
+        this.preventRepeatRequest = false
+      }
+    },
+    // 隐藏动画
+    hideLoading () {
+      this.showLoading = false
+    },
+    // 显示规格列表
+    showChooseList (foods) {
+      if (foods) {
+        this.choosedFoods = foods
+      }
+      this.showSpecs = !this.showSpecs
+      this.specsIndex = 0
+    },
+    // 记录当前所选规格的索引值
+    chooseSpecs (index) {
+      this.specsIndex = index
+    },
+    // 多规格商品加入购物车
+    addSpecs (category_id, item_id, food_id, name, price, specs, packing_fee, sku_id, stock) {
+      this.ADD_CART({ shopid: this.shopId, category_id, item_id, food_id, name, price, specs, packing_fee, sku_id, stock })
+      this.showChooseList()
+    },
+    // 显示提示，无法减去商品
+    showReduceTip () {
+      this.showDeleteTip = true
+      clearTimeout(this.timer)
+      this.timer = setTimeout(() => {
+        clearTimeout(this.timer)
+        this.showDeleteTip = false
+      }, 3000)
+    },
+    // 显示下落圆球
+    showMoveDotFun (showMoveDot, elLeft, elBottom) {
+      this.showMoveDot = [...this.showMoveDot, ...showMoveDot]
+      this.elLeft = elLeft
+      this.elBottom = elBottom
+    },
+    beforeEnter (el) {
+      el.style.transform = `translate3d(0,${37 + this.elBottom - this.windowHeight}px,0)`
+      el.children[0].style.transform = `translate3d(${this.elLeft - 30}px,0,0)`
+      el.children[0].style.opacity = 0
+    },
+    afterEnter (el) {
+      el.style.transform = `translate3d(0,0,0)`
+      el.children[0].style.transform = `translate3d(0,0,0)`
+      el.style.transition = 'transform .55s cubic-bezier(0.3, -0.25, 0.7, -0.15)'
+      el.children[0].style.transition = 'transform .55s linear'
+      this.showMoveDot = this.showMoveDot.map(item => false)
+      el.children[0].style.opacity = 1
+      el.children[0].addEventListener('transitionend', () => {
+        this.lsitenInCart()
+      })
+      el.children[0].addEventListener('webkitAnimationEnd', () => {
+        this.listenInCart()
+      })
+    },
     goback () {
       this.$router.go(-1)
+    }
+  },
+  watch: {
+    // showLoading变化时说明组件已经获取初始化数据，在下一贞nextTick进行后续操作
+    showLoading (value) {
+      if (!value) {
+        this.$nextTick(() => {
+          // this.
+        })
+      }
+    },
+    // 商品，评价切换状态
+    changeShowType (value) {
+      if (value === 'rating') {
+        this.$nextTick(() => {
+          this.ratingScroll = new BScroll('#ratingContainer', {
+            probeType: 3,
+            deceleration: 0.003,
+            bounce: false,
+            swipeTime: 2000,
+            click: true
+          })
+          this.ratingScroll.on('scroll', (pos) => {
+            if (Math.abs(Math.round(pos.y)) >= Math.abs(Math.round(this.ratingScroll.maxScrollY))) {
+              this.loaderMoreRating()
+              this.ratingScroll.refresh()
+            }
+          })
+        })
+      }
     }
   }
 }
@@ -811,6 +962,152 @@ export default {
             span:nth-of-type(3){
               @include sc(.5rem, #666);
             }
+          }
+        }
+      }
+    }
+  }
+  .buy_cart_container{
+    position: absolute;
+    background-color: #3d3d3f;
+    bottom: 0;
+    left: 0;
+    z-index: 13;
+    display: flex;
+    @include wh(100%, 2rem);
+    .cart_icon_num{
+      flex: 1;
+      .cart_icon_container{
+        display: flex;
+        background-color: #3d3d3f;
+        position: absolute;
+        padding: .4rem;
+        border: 0.18rem solid #444;
+        border-radius: 50%;
+        left: .5rem;
+        top: -.7rem;
+        .cart_icon{
+          @include wh(1.2rem, 1.2rem);
+        }
+        .cart_list_length{
+          position: absolute;
+          top: -.25rem;
+          right: -.25rem;
+          background-color: #ff461d;
+          line-height: .7rem;
+          text-align: center;
+          border-radius: 50%;
+          border: 0.025rem solid #ff461d;
+          min-width: .7rem;
+          height: .7rem;
+          @include sc(.5rem, #fff);
+          font-family: Helvetica Neue,Tahoma,Arial;
+        }
+      }
+      .move_in_cart{
+        animation: mymove .5s ease-in-out;
+      }
+      .cart_icon_activity{
+        background-color: #3190e8;
+      }
+      .cart_num{
+        @include ct;
+        left: 3.5rem;
+        div{
+          color: #fff;
+        }
+        div:nth-of-type(1){
+          font-size: .8rem;
+          font-weight: bold;
+          margin-bottom: .1rem;
+        }
+        div:nth-of-type(2){
+          font-size: .4rem;
+        }
+      }
+    }
+    .gotopay{
+      position: absolute;
+      right: 0;
+      background-color: #535356;
+      @include wh(5rem, 100%);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      .gotopay_button_style{
+        @include sc(.7rem, #fff);
+        font-weight: bold;
+      }
+    }
+    .gotopay_acitvity{
+      background-color: #4cd964;
+    }
+  }
+  .cart_food_list{
+    position: fixed;
+    width: 100%;
+    padding-bottom: 2rem;
+    z-index: 12;
+    bottom: 0;
+    left: 0;
+    background-color: #fff;
+    header{
+      @include fj;
+      align-items: center;
+      padding: .3rem .6rem;
+      background-color: #eceff1;
+      svg{
+        @include wh(.6rem, .6rem);
+        vertical-align: middle;
+      }
+      h4{
+        @include sc(.7rem, #666);
+      }
+      .clear_cart{
+        @include sc(.6rem, #666);
+      }
+    }
+    .cart_food_details{
+      background-color: #fff;
+      max-height: 20rem;
+      overflow-y: auto;
+      .cart_food_li{
+        @include fj;
+        padding: .6rem .5rem;
+        .cart_list_num{
+          width: 55%;
+          p:nth-of-type(1){
+            @include sc(.7rem, #666);
+            font-weight: bold;
+          }
+          p:nth-of-type(2){
+            @include sc(.4rem, #666);
+          }
+        }
+        .cart_list_price{
+          font-size: 0;
+          span:nth-of-type(1){
+            @include sc(.6rem, #f60);
+            font-family: Helvetica Neue,Tahoma;
+          }
+          span:nth-of-type(2){
+            @include sc(.7rem, #f60);
+            font-family: Helvetica Neue,Tahoma;
+            font-weight: bold;
+          }
+        }
+        .cart_list_control{
+          display: flex;
+          algin-items: center;
+          span{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          svg{
+            @include wh(.9rem, .9rem);
+            fill: #999;
           }
         }
       }
